@@ -1,0 +1,26 @@
+{
+  "name": "Leaflet.LeaderLine",
+  "version": "1.0.0",
+  "description": "Leaflet plugin for drawing leader lines connecting a geometric shape to a label.",
+  "type": "module",
+  "main": "Leaflet.LeaderLine.js",
+  "author": "Lars Boris",
+  "license": "ISC",
+  "peerDependencies": {
+    "leaflet": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Starcodr/leaflet-leader-line.git"
+  },
+  "keywords": [
+    "leaflet",
+    "leader line",
+    "polygon",
+    "label"
+  ],
+  "dependencies": {
+    "leaflet-geometryutil": "^0.10.2",
+    "svg-path-bounds": "^1.0.2"
+  }
+}
