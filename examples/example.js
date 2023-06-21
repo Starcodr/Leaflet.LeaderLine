@@ -56,7 +56,9 @@ $(function () {
 
 		/* Leader line */
 		let leaderLine = new L.LeaderLine(layer, tooltip, {
-			someTest: 7
+			someTest: 7,
+			interactive: true,
+			attachHorizontal: false
 		});
 
 		leaderLine.addTo(leaderLinesLayer);

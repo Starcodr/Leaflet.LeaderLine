@@ -3,12 +3,14 @@
 
 L.LeaderLine = L.Polyline.extend({
 	options: {
-		width: 1,
-		height: 1,
-		attachPoint: "outside", // outside/inside/corner
-		attachHorizontal: false,
+		interactive: true,
+		attachTo: "boundary", // boundary/center
+		attachToBoundaryOn: "both", // edge, vertex or both
+		attachToBoundarySingleLine: false,
+		attachToTooltipHorizontal: true,
 		attachOutsideSpacing: 10,
-		lineCornerRadius: 10
+		lineCornerRadius: 10,
+		className: "leaderline"
 	},
 
 	mapx: null,
@@ -34,8 +36,7 @@ L.LeaderLine = L.Polyline.extend({
 		this.tooltipElement = this.tooltip.getElement();
 		this.currentTooltipPosition = this.tooltip.getLatLng();
 
-		this._createDraggable();
-		this._setLineCornerRadius(this.options.lineCornerRadius);
+		this._initInteractive();
 
 		let latlng = this.feature.getCenter();
 		let latlngs = [
@@ -52,8 +53,13 @@ L.LeaderLine = L.Polyline.extend({
 			lineJoin: "round"
 		};
 
+		// console.log(this.feature.feature.geometry.type);
+		if (this.feature.feature.geometry.type == "MultiPolygon") this.options.attachTo = "center"
+
 		L.extend(options, opt);
 		L.setOptions(this, options);
+
+		this._setOptions();
 	},
 
 	onAdd: function (layer) {
@@ -72,7 +78,27 @@ L.LeaderLine = L.Polyline.extend({
 		// this._updateLeaderLine();
 	},
 
-	_setLineCornerRadius(radius) {
+	setOptions(opt, update = true) {
+		L.extend(options, opt);
+
+		this._setOptions();
+
+		if (update) this._updateLeaderLine();
+	},
+
+	_setOptions() {
+		this._setLineCornerRadius();
+
+		if (this.options.interactive) {
+			this.draggable.enable();
+		} else {
+			this.draggable.disable();
+		}
+	},
+
+	_setLineCornerRadius() {
+		let radius = this.options.lineCornerRadius;
+
 		let arcPathTopLeft = '<path d="M ' + radius + ',0 Q 0,0 0,' + radius + '" stroke="black" fill="none" stroke-width="1" fill-opacity="0.5"/>';
 		let arcPathTopRight = '<path d="M ' + radius + ',' + radius + ' Q ' + radius + ',0 0,0" stroke="black" fill="none" stroke-width="1" fill-opacity="0.5"/>';
 		let arcPathBottomRight = '<path d="M 0,' + radius + ' Q ' + radius + ',' + radius + ' ' + radius + ',0" stroke="black" fill="none" stroke-width="1" fill-opacity="0.5"/>';
@@ -113,9 +139,8 @@ L.LeaderLine = L.Polyline.extend({
 	// 	L.Path.prototype.onRemove.call(this, map);
 	// },
 
-	_createDraggable: function () {
+	_initInteractive: function () {
 		this.draggable = new L.Draggable(this.tooltipElement);
-		this.draggable.enable();
 
 		this.draggable.on('dragend', (e) => ((draggable, tooltip) => {
 			L.DomEvent.stopPropagation(e);
@@ -134,6 +159,15 @@ L.LeaderLine = L.Polyline.extend({
 
 			this.currentTooltipPosition = this.tooltip.getLatLng();
 		})());
+
+		this.on('click', (e) => (() => {
+			if (this.options.interactive) {
+				L.DomEvent.stopPropagation(e);
+				this.options.attachToTooltipHorizontal = !this.options.attachToTooltipHorizontal;
+
+				this._updateLeaderLine();
+			}
+		})());
 	},
 
 	_updateLeaderLine: function () {
@@ -144,177 +178,206 @@ L.LeaderLine = L.Polyline.extend({
 			if (this.lineCornerArc != null) this.lineCornerArc.removeFrom(this.mapx);
 
 			/* Only show connector line if outside polygon */
-			let toolTipBounds = this.tooltipElement.getBoundingClientRect();
-			let mapBounds = $("#map")[0].getBoundingClientRect();
-
-			toolTipBounds.left = toolTipBounds.left - this.options.attachOutsideSpacing;
-			toolTipBounds.right = toolTipBounds.right + this.options.attachOutsideSpacing;
-			toolTipBounds.top = toolTipBounds.top - this.options.attachOutsideSpacing;
-			toolTipBounds.bottom = toolTipBounds.bottom + this.options.attachOutsideSpacing;
-
-			let topLeft = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.top - mapBounds.top);
-			let topRight = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.top - mapBounds.top);
-			let bottomLeft = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
-			let bottomRight = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
-			let topMiddle = new L.Point(toolTipBounds.left + (toolTipBounds.right - toolTipBounds.left) / 2 - mapBounds.left, toolTipBounds.top - mapBounds.top);
-			let bottomMiddle = new L.Point(toolTipBounds.left + (toolTipBounds.right - toolTipBounds.left) / 2 - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
-			let leftMiddle = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.top + (toolTipBounds.bottom - toolTipBounds.top) / 2 - mapBounds.top);
-			let rightMiddle = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.top + (toolTipBounds.bottom - toolTipBounds.top) / 2 - mapBounds.top);
-
 			if (!this.feature.contains(this.currentTooltipPosition)) {
-				// let sortedPolylines = this._sortedPolylines(this.feature, this.currentTooltipPosition);
-				let center = this.feature.getCenter(); //sortedPolylines[0]["middleOfPolyline"];
-				let centerPoint = this.mapx.latLngToContainerPoint(this.feature.getCenter());
-
-				// let centerPosition = "";
-
-
-				let svgStartPoint = new L.Point(0, 0);
-				let cornerPoint = new L.Point(0, 0);
-
-				let centerPointIsSouth = centerPoint.x > (topLeft.x - this.options.attachOutsideSpacing) && centerPoint.x < (topRight.x + this.options.attachOutsideSpacing) && centerPoint.y > bottomRight.y;
-				let centerPointIsNorth = centerPoint.x > (topLeft.x - this.options.attachOutsideSpacing) && centerPoint.x < (topRight.x + this.options.attachOutsideSpacing) && centerPoint.y < topRight.y;
-				let centerPointIsWest = centerPoint.x < topLeft.x && centerPoint.y < (bottomLeft.y + this.options.attachOutsideSpacing) && centerPoint.y > (topLeft.y - this.options.attachOutsideSpacing);
-				let centerPointIsEast = centerPoint.x > topRight.x && centerPoint.y < (bottomRight.y + this.options.attachOutsideSpacing) && centerPoint.y > (topRight.y - this.options.attachOutsideSpacing);
-
-				if (centerPointIsWest) { // "west" - always attach to left side of label
-					svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y);
-					cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-					if (svgStartPoint.y < centerPoint.y) {
-						this.lineCornerArc = this.arcTopLeft;
-					} else {
-						this.lineCornerArc = this.arcBottomLeft;
-					}
-				} else if (centerPointIsEast) { // "east" - always attach to right side of label
-					svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y);
-					cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-					if (svgStartPoint.y < centerPoint.y) {
-						this.lineCornerArc = this.arcTopRight;
-					} else {
-						this.lineCornerArc = this.arcBottomRight;
-					}
-				} else if (centerPointIsNorth) { // "north" - always attach to top of label
-					svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing);
-					cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-					if (svgStartPoint.x < centerPoint.x) {
-						this.lineCornerArc = this.arcTopLeft;
-					} else {
-						this.lineCornerArc = this.arcTopRight;
-					}
-				} else if (centerPointIsSouth) { // "south" - always attach to bottom of label
-					svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing);
-					cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-					if (svgStartPoint.x < centerPoint.x) {
-						this.lineCornerArc = this.arcBottomLeft;
-					} else {
-						this.lineCornerArc = this.arcBottomRight;
-					}
-				} else if (centerPoint.x < topLeft.x && centerPoint.y < topLeft.y) { // "northwest"
-					if (this.options.attachHorizontal) {
-						svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y); // attach to left side
-						cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-						this.lineCornerArc = this.arcBottomLeft;
-					} else {
-						svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing); // attach to top
-						cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-						this.lineCornerArc = this.arcTopRight;
-					}
-				} else if (centerPoint.x > topRight.x && centerPoint.y < topRight.y) { // "northeast"
-					if (this.options.attachHorizontal) {
-						svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y); // attach to right side
-						cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-						this.lineCornerArc = this.arcBottomRight;
-					} else {
-						svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing); // attach to top
-						cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-						this.lineCornerArc = this.arcTopLeft;
-					}
-				} else if (centerPoint.x > topRight.x && centerPoint.y > bottomRight.y) { // "southeast"
-					if (this.options.attachHorizontal) {
-						svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y); // attach to right side
-						cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-						this.lineCornerArc = this.arcTopRight;
-					} else {
-						svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing); // attach to bottom
-						cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-						this.lineCornerArc = this.arcBottomLeft;
-					}
-				} else if (centerPoint.x < topLeft.x && centerPoint.y > bottomLeft.y) { // "southwest"
-					if (this.options.attachHorizontal) {
-						svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y); // attach to left side
-						cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-						this.lineCornerArc = this.arcTopLeft;
-					} else {
-						svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing); // attach to bottom
-						cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-						this.lineCornerArc = this.arcBottomRight;
-					}
+				switch (this.options.attachTo) {
+					case "center": this._attachToFeatureCenter()
+					case "boundary": this._attachToBoundary()
 				}
-
-				if (this.lineCornerArc != null) console.log(this.arcBottomLeft.getElement());
-
-				// if (this.options.attachHorizontal) {
-				// 	if (centerPointIsNorth || centerPointIsSouth) {
-				// 		cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-				// 	} else {
-				// 		cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-				// 	}
-				// } else {
-				// 	if (centerPointIsWest || centerPointIsEast) {
-				// 		cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
-				// 	} else {
-				// 		cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
-				// 	}
-				// }
-
-				let svgStartPointCoordinates = this.mapx.containerPointToLatLng(svgStartPoint);
-				let cornerPointCoordinates = this.mapx.containerPointToLatLng(cornerPoint);
-
-				let latlngs = [
-					[svgStartPointCoordinates.lat, svgStartPointCoordinates.lng],
-					[cornerPointCoordinates.lat, cornerPointCoordinates.lng],
-					[center.lat, center.lng]
-				];
-
-
-				// let metersPerPixel = 40075016.686 * Math.abs(Math.cos(this.mapx.getCenter().lat * Math.PI/180)) / Math.pow(2, this.mapx.getZoom()+8);
-
-				let line1Path = '<path d="M ' + svgStartPoint.x + ', ' + svgStartPoint.y + ' L ' + cornerPoint.x + ', ' + (cornerPoint.y + 56) + '" stroke="black" fill="none" stroke-width="3" fill-opacity="0.5"/>';
-
-				// console.log(line1Path);
-
-				let svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-				svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
-				// svgElement.setAttribute('viewBox', "0 0 " + (cornerPoint.x - svgStartPoint.x) + " 1");
-				svgElement.innerHTML = line1Path;
-
-				// let bounds1 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x - 10, cornerPoint.y - 10));
-				// let bounds2 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x + 10, cornerPoint.y + 10));
-				let bounds1 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x - 10, cornerPoint.y - 10));
-				let bounds2 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x + 10, cornerPoint.y + 10));
-
-				// console.log(bounds1);
-				// console.log(bounds2);
-
-				var svgElementBounds = new L.LatLngBounds(bounds1, bounds2);
-				let line1Bounds = new L.LatLngBounds(cornerPointCoordinates, svgStartPointCoordinates);
-				// console.log(line1Bounds);
-				let x = L.svgOverlay(svgElement, line1Bounds);
-x.addTo(this.mapx);
-
-				// let latlngs = [
-				// 	[bounds1.lat, bounds1.lng],
-				// 	[bounds2.lat, bounds2.lng]
-				// ];
-
-				this.setLatLngs(latlngs);
-
 			} else {
 				this.setLatLngs([]);
 			}
 		} catch (exception) {
 			console.log(exception);
 		}
+	},
+
+	_attachToFeatureCenter() {
+		let toolTipBounds = this.tooltipElement.getBoundingClientRect();
+		let mapBounds = $("#map")[0].getBoundingClientRect();
+
+		toolTipBounds.left = toolTipBounds.left - this.options.attachOutsideSpacing;
+		toolTipBounds.right = toolTipBounds.right + this.options.attachOutsideSpacing;
+		toolTipBounds.top = toolTipBounds.top - this.options.attachOutsideSpacing;
+		toolTipBounds.bottom = toolTipBounds.bottom + this.options.attachOutsideSpacing;
+
+		let topLeft = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.top - mapBounds.top);
+		let topRight = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.top - mapBounds.top);
+		let bottomLeft = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
+		let bottomRight = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
+		let topMiddle = new L.Point(toolTipBounds.left + (toolTipBounds.right - toolTipBounds.left) / 2 - mapBounds.left, toolTipBounds.top - mapBounds.top);
+		let bottomMiddle = new L.Point(toolTipBounds.left + (toolTipBounds.right - toolTipBounds.left) / 2 - mapBounds.left, toolTipBounds.bottom - mapBounds.top);
+		let leftMiddle = new L.Point(toolTipBounds.left - mapBounds.left, toolTipBounds.top + (toolTipBounds.bottom - toolTipBounds.top) / 2 - mapBounds.top);
+		let rightMiddle = new L.Point(toolTipBounds.right - mapBounds.left, toolTipBounds.top + (toolTipBounds.bottom - toolTipBounds.top) / 2 - mapBounds.top);
+
+		// let sortedPolylines = this._sortedPolylines(this.feature, this.currentTooltipPosition);
+		let center = this.feature.getCenter(); //sortedPolylines[0]["middleOfPolyline"];
+		let centerPoint = this.mapx.latLngToContainerPoint(this.feature.getCenter());
+
+		// let centerPosition = "";
+
+		let svgStartPoint = new L.Point(0, 0);
+		let cornerPoint = new L.Point(0, 0);
+
+		let centerPointIsSouth = centerPoint.x > (topLeft.x - this.options.attachOutsideSpacing) && centerPoint.x < (topRight.x + this.options.attachOutsideSpacing) && centerPoint.y > bottomRight.y;
+		let centerPointIsNorth = centerPoint.x > (topLeft.x - this.options.attachOutsideSpacing) && centerPoint.x < (topRight.x + this.options.attachOutsideSpacing) && centerPoint.y < topRight.y;
+		let centerPointIsWest = centerPoint.x < topLeft.x && centerPoint.y < (bottomLeft.y + this.options.attachOutsideSpacing) && centerPoint.y > (topLeft.y - this.options.attachOutsideSpacing);
+		let centerPointIsEast = centerPoint.x > topRight.x && centerPoint.y < (bottomRight.y + this.options.attachOutsideSpacing) && centerPoint.y > (topRight.y - this.options.attachOutsideSpacing);
+
+		if (centerPointIsWest) { // "west" - always attach to left side of label
+			svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y);
+			cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+			if (svgStartPoint.y < centerPoint.y) {
+				this.lineCornerArc = this.arcTopLeft;
+			} else {
+				this.lineCornerArc = this.arcBottomLeft;
+			}
+		} else if (centerPointIsEast) { // "east" - always attach to right side of label
+			svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y);
+			cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+			if (svgStartPoint.y < centerPoint.y) {
+				this.lineCornerArc = this.arcTopRight;
+			} else {
+				this.lineCornerArc = this.arcBottomRight;
+			}
+		} else if (centerPointIsNorth) { // "north" - always attach to top of label
+			svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing);
+			cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+			if (svgStartPoint.x < centerPoint.x) {
+				this.lineCornerArc = this.arcTopLeft;
+			} else {
+				this.lineCornerArc = this.arcTopRight;
+			}
+		} else if (centerPointIsSouth) { // "south" - always attach to bottom of label
+			svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing);
+			cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+			if (svgStartPoint.x < centerPoint.x) {
+				this.lineCornerArc = this.arcBottomLeft;
+			} else {
+				this.lineCornerArc = this.arcBottomRight;
+			}
+		} else if (centerPoint.x < topLeft.x && centerPoint.y < topLeft.y) { // "northwest"
+			if (this.options.attachToTooltipHorizontal) {
+				svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y); // attach to left side
+				cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+				this.lineCornerArc = this.arcBottomLeft;
+			} else {
+				svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing); // attach to top
+				cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+				this.lineCornerArc = this.arcTopRight;
+			}
+		} else if (centerPoint.x > topRight.x && centerPoint.y < topRight.y) { // "northeast"
+			if (this.options.attachToTooltipHorizontal) {
+				svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y); // attach to right side
+				cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+				this.lineCornerArc = this.arcBottomRight;
+			} else {
+				svgStartPoint = new L.Point(topMiddle.x, topMiddle.y - this.options.attachOutsideSpacing); // attach to top
+				cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+				this.lineCornerArc = this.arcTopLeft;
+			}
+		} else if (centerPoint.x > topRight.x && centerPoint.y > bottomRight.y) { // "southeast"
+			if (this.options.attachToTooltipHorizontal) {
+				svgStartPoint = new L.Point(rightMiddle.x + this.options.attachOutsideSpacing, rightMiddle.y); // attach to right side
+				cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+				this.lineCornerArc = this.arcTopRight;
+			} else {
+				svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing); // attach to bottom
+				cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+				this.lineCornerArc = this.arcBottomLeft;
+			}
+		} else if (centerPoint.x < topLeft.x && centerPoint.y > bottomLeft.y) { // "southwest"
+			if (this.options.attachToTooltipHorizontal) {
+				svgStartPoint = new L.Point(leftMiddle.x - this.options.attachOutsideSpacing, leftMiddle.y); // attach to left side
+				cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+				this.lineCornerArc = this.arcTopLeft;
+			} else {
+				svgStartPoint = new L.Point(bottomMiddle.x, bottomMiddle.y + this.options.attachOutsideSpacing); // attach to bottom
+				cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+				this.lineCornerArc = this.arcBottomRight;
+			}
+		}
+
+		// if (this.lineCornerArc != null) console.log(this.arcBottomLeft.getElement());
+
+		// if (this.options.attachToTooltipHorizontal) {
+		// 	if (centerPointIsNorth || centerPointIsSouth) {
+		// 		cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+		// 	} else {
+		// 		cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+		// 	}
+		// } else {
+		// 	if (centerPointIsWest || centerPointIsEast) {
+		// 		cornerPoint = new L.Point(centerPoint.x, svgStartPoint.y);
+		// 	} else {
+		// 		cornerPoint = new L.Point(svgStartPoint.x, centerPoint.y);
+		// 	}
+		// }
+
+		let svgStartPointCoordinates = this.mapx.containerPointToLatLng(svgStartPoint);
+		let cornerPointCoordinates = this.mapx.containerPointToLatLng(cornerPoint);
+
+		// let metersPerPixel = 40075016.686 * Math.abs(Math.cos(this.mapx.getCenter().lat * Math.PI/180)) / Math.pow(2, this.mapx.getZoom()+8);
+
+		let line1Path = '<path d="M ' + svgStartPoint.x + ', ' + svgStartPoint.y + ' L ' + cornerPoint.x + ', ' + (cornerPoint.y + 56) + '" stroke="black" fill="none" stroke-width="3" fill-opacity="0.5"/>';
+
+		// console.log(line1Path);
+
+		let svgElement = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svgElement.setAttribute('xmlns', "http://www.w3.org/2000/svg");
+		// svgElement.setAttribute('viewBox', "0 0 " + (cornerPoint.x - svgStartPoint.x) + " 1");
+		svgElement.innerHTML = line1Path;
+
+		// let bounds1 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x - 10, cornerPoint.y - 10));
+		// let bounds2 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x + 10, cornerPoint.y + 10));
+		let bounds1 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x - 10, cornerPoint.y - 10));
+		let bounds2 = this.mapx.containerPointToLatLng(new L.Point(cornerPoint.x + 10, cornerPoint.y + 10));
+
+		// console.log(bounds1);
+		// console.log(bounds2);
+
+		var svgElementBounds = new L.LatLngBounds(bounds1, bounds2);
+		let line1Bounds = new L.LatLngBounds(cornerPointCoordinates, svgStartPointCoordinates);
+		// console.log(line1Bounds);
+		let x = L.svgOverlay(svgElement, line1Bounds);
+
+		x.addTo(this.mapx);
+
+		let latlngs = [
+			[svgStartPointCoordinates.lat, svgStartPointCoordinates.lng],
+			[cornerPointCoordinates.lat, cornerPointCoordinates.lng],
+			[center.lat, center.lng]
+		];
+
+		this.setLatLngs(latlngs);
+	},
+
+	_attachToBoundary() {
+		let sortedFeatures = this._sortedFeatures(this.feature, this.currentTooltipPosition);
+
+		// console.log(sortedFeatures);
+
+		if (sortedFeatures.length > 0) {
+			let attachPoint = sortedFeatures[0].latlng;
+
+			if (this.options.attachToBoundarySingleLine) {
+				this.setLatLngs([
+					[this.currentTooltipPosition.lat, this.currentTooltipPosition.lng],
+					[attachPoint.lat, attachPoint.lng]
+				]);
+			} else {
+				this.setLatLngs([
+					[this.currentTooltipPosition.lat, this.currentTooltipPosition.lng],
+					[this.currentTooltipPosition.lat, attachPoint.lng],
+					[attachPoint.lat, attachPoint.lng]
+				]);
+			}
+		} else {
+			this.setLatLngs([]);
+		}
+	},
+
+	_attachToCorner() {
+
 	},
 
 	_pixelBoundsToLatLng(corner1, corner2) {
@@ -335,39 +398,49 @@ x.addTo(this.mapx);
 		return mapHeightInMetres / mapHeightInPixels;
 	},
 
-	_sortedPolylines: function (polygon, latlng) {
-		let polylines = this._polygonToPolylines(polygon);
+	_sortedFeatures: function (polygon, latlng) {
+		let sortedFeatures = new Array();
 
-		let sortedPolylines = new Array();
+		if (polygon.feature.geometry.type == "MultiPolygon") return Array(); // For some reason this happens sometimes
 
-		// let info = {
-		// 	closestPolyline: null,
-		// 	shortestDistance: 9999999999
-		// };
+		if (this.options.attachToBoundaryOn == "edge" || this.options.attachToBoundaryOn == "both") {
+			let polylines = this._polygonToPolylines(polygon);
 
-		for (var i = 0; i < polylines.length; i++) {
-			// let polyline = polylines[i];
-			let middleOfPolyline = L.GeometryUtil.interpolateOnLine(this.mapx, polylines[i], 0.5);
-			let distance = L.GeometryUtil.distance(this.mapx, latlng, middleOfPolyline.latLng);
+			for (var i = 0; i < polylines.length; i++) {
+				let polyline = polylines[i]; //.flat();
+				let middleOfPolyline = L.GeometryUtil.interpolateOnLine(this.mapx, polyline, 0.5);
+				let distance = L.GeometryUtil.distance(this.mapx, latlng, middleOfPolyline.latLng);
 
-			sortedPolylines.push({
-				polyline: polylines[i],
-				middleOfPolyline: middleOfPolyline,
-				distance: distance
-			});
+				sortedFeatures.push({
+					type: "polyline",
+					feature: polylines[i],
+					latlng: middleOfPolyline.latLng,
+					distance: distance
+				});
+			}
 		}
 
-		sortedPolylines.sort(function (a, b) {
+		if (this.options.attachToBoundaryOn == "vertex" || this.options.attachToBoundaryOn == "both") {
+			for (var i = 0; i < polygon.getLatLngs()[0].length; i++) { // why nested array?
+				sortedFeatures.push({
+					type: "vertex",
+					feature: polygon.getLatLngs()[0][i],
+					latlng: polygon.getLatLngs()[0][i],
+					distance: L.GeometryUtil.distance(this.mapx, latlng, polygon.getLatLngs()[0][i])
+				});
+			}
+		}
+
+		sortedFeatures.sort(function (a, b) {
 			if (a.distance > b.distance) { return 1; }
 			if (a.distance < b.distance) { return -1; }
 			return 0;
 		});
 
-		return sortedPolylines;
+		return sortedFeatures;
 	},
 
 	_polygonToPolylines: function (polygon) {
-		// console.log(polygon);
 		let polylines = Array();
 		let polygons = polygon.getLatLngs();
 
