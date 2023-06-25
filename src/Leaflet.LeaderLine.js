@@ -6,11 +6,19 @@ L.LeaderLine = L.Polyline.extend({
 		interactive: true,
 		attachTo: "boundary", // boundary/center
 		attachToBoundaryOn: "both", // edge, vertex or both
-		attachToBoundarySingleLine: false,
+		attachToBoundarySingleLine: true,
 		attachToTooltipHorizontal: true,
 		attachOutsideSpacing: 10,
 		lineCornerRadius: 10,
-		className: "leaderline"
+		className: "leaderline",
+		tooltip: {
+			latLng: null,
+			content: ""
+		},
+		color: '#fefefe',
+		weight: 2.5,
+		opacity: 1.0,
+		lineJoin: "round"
 	},
 
 	mapx: null,
@@ -27,39 +35,24 @@ L.LeaderLine = L.Polyline.extend({
 	arcBottomLeft: null,
 	lineCornerArc: null,
 
-	initialize: function (_feature, _tooltip, options) {
+	initialize: function (_feature, _tooltip, _options) {
 		// L.Path.prototype.initialize.call(this, map);
+		L.extend(this.options, _options);
 
 		this.feature = _feature;
 		this.tooltip = _tooltip;
 
+		if (this.options.tooltip.latLng == null) this.options.tooltip.latLng = this.feature.getCenter();
+
 		this.tooltipElement = this.tooltip.getElement();
 		this.currentTooltipPosition = this.tooltip.getLatLng();
-
-		this._initInteractive();
-
-		let latlng = this.feature.getCenter();
-		let latlngs = [
-			[latlng.lat, latlng.lng],
-			[this.tooltip.getLatLng().lat, this.tooltip.getLatLng().lng]
-		];
-
-		this._setLatLngs(latlngs);
-
-		let opt = {
-			color: '#fefefe',
-			weight: 2.5,
-			opacity: 1.0,
-			lineJoin: "round"
-		};
 
 		// console.log(this.feature.feature.geometry.type);
 		if (this.feature.feature.geometry.type == "MultiPolygon") this.options.attachTo = "center"
 
-		L.extend(options, opt);
-		L.setOptions(this, options);
+		console.log(this.options);
+		L.setOptions(this, this.options);
 
-		this._setOptions();
 	},
 
 	onAdd: function (layer) {
@@ -68,6 +61,16 @@ L.LeaderLine = L.Polyline.extend({
 		this.mapx.on('zoom', () => {
 			this._updateLeaderLine();
 		});
+
+		let latlng = this.feature.getCenter();
+		let latlngs = [
+			[latlng.lat, latlng.lng],
+			[this.tooltip.getLatLng().lat, this.tooltip.getLatLng().lng]
+		];
+
+		this._setLatLngs(latlngs);
+		this._initInteractive();
+		this._activateOptions();
 
 		L.Polyline.prototype.onAdd.call(this, map);
 		this._updateLeaderLine();
@@ -81,12 +84,12 @@ L.LeaderLine = L.Polyline.extend({
 	setOptions(opt, update = true) {
 		L.extend(options, opt);
 
-		this._setOptions();
+		this._activateOptions();
 
 		if (update) this._updateLeaderLine();
 	},
 
-	_setOptions() {
+	_activateOptions() {
 		this._setLineCornerRadius();
 
 		if (this.options.interactive) {
@@ -149,15 +152,20 @@ L.LeaderLine = L.Polyline.extend({
 		})(this.draggable, this.tooltip));
 
 		this.draggable.on('drag', (e) => ((draggable, tooltip) => {
+			console.log("drag");
 			let latlng = this._map.mouseEventToLatLng(e.originalEvent);
+			this.tooltip.setLatLng()
 			this.currentTooltipPosition = latlng;
 			this._updateLeaderLine();
 		})(this.draggable, this.tooltip));
 
 		this.draggable.on('dragstart', (e) => (() => {
 			//let latlng = //this.map.mouseEventToLatLng(e.propagatedFrom);
-
 			this.currentTooltipPosition = this.tooltip.getLatLng();
+		})());
+
+		this.tooltip.on('click', (e) => (() => {
+			console.log("tooltip");
 		})());
 
 		this.on('click', (e) => (() => {

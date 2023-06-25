@@ -39,26 +39,22 @@ $(function () {
 
 	polygonLayer.addData(statesData);
 	polygonLayer.eachLayer( (layer) => {
-		// console.log(layer.feature.properties);
-
-		let latlng = layer.getCenter();
-
 		/* Tooltip */
-		var tooltip = L.tooltip({
+		let tooltip = L.tooltip({
 			permanent: true,
 			sticky: true,
-			interactive: true,
 			direction: "center"
 		})
-		.setLatLng(latlng)
+		.setLatLng(layer.getCenter())
 		.setContent(layer.feature.properties.name)
 		.addTo(map);
-
-		/* Leader line */
+console.log(tooltip);
 		let leaderLine = new L.LeaderLine(layer, tooltip, {
-			someTest: 7,
 			interactive: true,
-			attachHorizontal: false
+			tooltip: {
+				latLng: layer.getCenter(),
+				content: layer.feature.properties.name
+			}
 		});
 
 		leaderLine.addTo(leaderLinesLayer);
