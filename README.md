@@ -4,22 +4,19 @@ Leaflet plugin for drawing leader lines connecting a geometric shape to a label.
 
 ## Installation
 ```
-Install the code from NPM repository:
-$ npm install leaflet-leader-line
+See example in "examples" folder for files to include.
 ```
 ```
 
-test
-```
-test.
+Not ready for use.
 
 #
 ## Usage
-### Use it
+### How to
 ```
-test
+no info
 ```
 ### Options
 ```
-test...
+no info
 ```

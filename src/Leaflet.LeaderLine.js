@@ -89,6 +89,14 @@ L.LeaderLine = L.Polyline.extend({
 		if (update) this._updateLeaderLine();
 	},
 
+	getOptions() {
+		return this.options;
+	},
+
+	getTooltip() {
+		return this.tooltip
+	},
+
 	_activateOptions() {
 		this._setLineCornerRadius();
 

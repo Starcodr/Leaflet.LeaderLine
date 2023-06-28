@@ -15,14 +15,9 @@ $(function () {
 	}).addTo(map);
 
 	/* Layer for polygons, tooltips and leader lines */
-	let leaderLinesLayer = new L.layerGroup();
+	let leaderLinesLayer = new L.layerGroup().addTo(map);
 
-	/* Finally add shared layer to map */
-	leaderLinesLayer.addTo(map);
-
-	/**
-	 * Test polygons
-	 */
+	/* Test polygons */
 	let polygonLayer = L.geoJSON({
 			type: "FeatureCollection",
 			features: []
@@ -38,8 +33,8 @@ $(function () {
 	).addTo(map);
 
 	polygonLayer.addData(statesData);
+
 	polygonLayer.eachLayer( (layer) => {
-		/* Tooltip */
 		let tooltip = L.tooltip({
 			permanent: true,
 			sticky: true,
@@ -48,19 +43,40 @@ $(function () {
 		.setLatLng(layer.getCenter())
 		.setContent(layer.feature.properties.name)
 		.addTo(map);
-console.log(tooltip);
+
 		let leaderLine = new L.LeaderLine(layer, tooltip, {
 			interactive: true,
 			tooltip: {
 				latLng: layer.getCenter(),
-				content: layer.feature.properties.name
+				content: layer.feature.properties.name,
+				featureId: layer.feature.id,
+				featureName: layer.feature.properties.name
 			}
 		});
 
 		leaderLine.addTo(leaderLinesLayer);
 	});
 
-	// /* Polygon */
-	// var latlngsx = [[37, -109.05],[41, -109.03],[41.5, -102.55],[38, -102.04]];
-	// var polygon = L.polygon(latlngsx, {color: 'red'}).addTo(map);
+	/**
+	 * Export state of leader lines and tooltip position. Modify as needed.
+	 */
+	leaderLineOptions = {};
+
+	leaderLinesLayer.eachLayer( (layer) => {
+		let options = layer.getOptions();
+
+		leaderLineOptions[options.tooltip.featureId] = {
+			state: options.tooltip.featureName,
+			attachTo: options.attachTo,
+			attachToBoundaryOn: options.attachToBoundaryOn,
+			attachToBoundarySingleLine: options.attachToBoundarySingleLine,
+			attachToTooltipHorizontal: options.attachToTooltipHorizontal,
+			tooltipPosition: layer.getTooltip().getLatLng()
+		}
+	});
+
+	$("#export-button").on("click", function(event) {
+		L.DomEvent.stopPropagation(event);
+		$("#output").empty().val(JSON.stringify(leaderLineOptions, null, 2));
+	});
 });
