@@ -36,19 +36,20 @@ $(function () {
 
 	polygonLayer.eachLayer( (layer) => {
 		let tooltip = L.tooltip({
+			interactive: true,
 			permanent: true,
 			sticky: true,
 			direction: "center"
 		})
 		.setLatLng(layer.getCenter())
+		// .setLatLng(new L.latLng(45.912774818772206,-90.89818557816999))
 		.setContent(layer.feature.properties.name)
 		.addTo(map);
 
 		let leaderLine = new L.LeaderLine(layer, tooltip, {
+			attachTo: "center",			
 			interactive: true,
 			tooltip: {
-				latLng: layer.getCenter(),
-				content: layer.feature.properties.name,
 				featureId: layer.feature.id,
 				featureName: layer.feature.properties.name
 			}
