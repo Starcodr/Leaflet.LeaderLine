@@ -162,7 +162,6 @@ L.LeaderLine = L.Polyline.extend({
 		})());
 
 		this.tooltip.on('click', (e) => (() => {
-			console.log("tooltip");
 		})());
 
 		this.on('click', (e) => (() => {
