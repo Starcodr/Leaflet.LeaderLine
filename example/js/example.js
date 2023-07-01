@@ -8,6 +8,14 @@ $(function () {
 		center: [39.8097343, -98.5556199]
 	};
 
+	let polygonOptions = {
+		fillColor: "#04859D",
+		fillOpacity: 0.2,
+		color: "#FF7C00",
+		opacity: 0.6,
+		weight: 0.8
+	}
+
 	var map = L.map('map', mapOptions);
 
 	var osmLayer = L.tileLayer('https://{s}.tile.osm.org/{z}/{x}/{y}.png', {
@@ -23,18 +31,16 @@ $(function () {
 			features: []
 		},
 		{
-			filter: function (feature, layer) {
-				return feature;
-			},
-			// style: this.areaPathOptions,
-			onEachFeature: (feature, layer) => {
-			}
+			filter: function (feature, layer) { return feature; },
+			style: polygonOptions,
+			onEachFeature: (feature, layer) => {}
 		}
 	).addTo(map);
 
 	polygonLayer.addData(statesData);
 
 	polygonLayer.eachLayer( (layer) => {
+		/* Interactive, permanent and sticky options must be set to true. */
 		let tooltip = L.tooltip({
 			interactive: true,
 			permanent: true,
@@ -46,9 +52,12 @@ $(function () {
 		.setContent(layer.feature.properties.name)
 		.addTo(map);
 
+		/* You can pass custom options, For instance an ID for later reference when using exported options. */
 		let leaderLine = new L.LeaderLine(layer, tooltip, {
-			attachTo: "center",			
+			attachTo: "center",
 			interactive: true,
+			weight: 2,
+			color: "#ffffff",
 			tooltip: {
 				featureId: layer.feature.id,
 				featureName: layer.feature.properties.name
@@ -61,23 +70,27 @@ $(function () {
 	/**
 	 * Export state of leader lines and tooltip position. Modify as needed.
 	 */
-	leaderLineOptions = {};
-
-	leaderLinesLayer.eachLayer( (layer) => {
-		let options = layer.getOptions();
-
-		leaderLineOptions[options.tooltip.featureId] = {
-			state: options.tooltip.featureName,
-			attachTo: options.attachTo,
-			attachToBoundaryOn: options.attachToBoundaryOn,
-			attachToBoundarySingleLine: options.attachToBoundarySingleLine,
-			attachToTooltipHorizontal: options.attachToTooltipHorizontal,
-			tooltipPosition: layer.getTooltip().getLatLng()
-		}
-	});
-
 	$("#export-button").on("click", function(event) {
 		L.DomEvent.stopPropagation(event);
+		leaderLineOptions = {};
+		L.popup()
+		.setLatLng(new L.latLng(39.8097343, -98.5556199))
+		.setContent('<pre>Hello</pre>')
+		.addTo(map)
+		.openOn(map);
+		leaderLinesLayer.eachLayer( (layer) => {
+			let options = layer.getOptions();
+	// console.log(options.tooltip.featureName + ": " + options.attachToTooltipHorizontal);
+			leaderLineOptions[options.tooltip.featureId] = {
+				state: options.tooltip.featureName,
+				attachTo: options.attachTo,
+				attachToBoundaryOn: options.attachToBoundaryOn,
+				attachToBoundarySingleLine: options.attachToBoundarySingleLine,
+				attachToTooltipHorizontal: options.attachToTooltipHorizontal,
+				tooltipPosition: layer.getTooltip().getLatLng()
+			}
+		});
+
 		$("#output").empty().val(JSON.stringify(leaderLineOptions, null, 2));
 	});
 });

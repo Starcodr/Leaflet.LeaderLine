@@ -56,7 +56,7 @@ L.LeaderLine = L.Polyline.extend({
 		let latlng = this.feature.getCenter();
 		let latlngs = [
 			[latlng.lat, latlng.lng],
-			[this.tooltip.getLatLng().lat, this.tooltip.getLatLng().lng]
+			[this.currentTooltipPosition.lat, this.currentTooltipPosition.lng]
 		];
 
 		this._setLatLngs(latlngs);
@@ -177,7 +177,7 @@ L.LeaderLine = L.Polyline.extend({
 	_updateLeaderLine: function () {
 		try {
 			/* Set new position of label */
-			// this.tooltip.setLatLng(this.currentTooltipPosition);
+			this.tooltip.setLatLng(this.currentTooltipPosition);
 
 			if (this.lineCornerArc != null) this.lineCornerArc.removeFrom(this.mapx);
 
@@ -202,7 +202,7 @@ L.LeaderLine = L.Polyline.extend({
 
 	_attachToFeatureCenter() {
 		let toolTipBounds = this.tooltipElement.getBoundingClientRect();
-		let mapBounds = $("#map")[0].getBoundingClientRect();
+		let mapBounds = document.getElementById("map").getBoundingClientRect() // $("#map")[0].getBoundingClientRect();
 
 		toolTipBounds.left = toolTipBounds.left - this.options.attachOutsideSpacing;
 		toolTipBounds.right = toolTipBounds.right + this.options.attachOutsideSpacing;
